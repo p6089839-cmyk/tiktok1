@@ -141,7 +141,6 @@
       max-width: 1600px;
       margin: 0 auto;
       flex: 1;
-      /* On desktop, we handle scroll inside containers */
       height: calc(100vh - 140px - var(--safe-top) - var(--safe-bottom)); 
       overflow: hidden;
     }
@@ -316,6 +315,8 @@
     }
     .btn-icon:hover { background: var(--accent-cyan); color: #000; transform: scale(1.1); }
     .btn-delete:hover { background: var(--danger); border-color: var(--danger); }
+    .btn-text { background: var(--accent-purple); }
+    .btn-text:hover { background: var(--accent-pink); }
     
     /* Right Sidebar */
     .sidebar-right {
@@ -441,6 +442,13 @@
     .modal-btn.secondary { background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-glow); }
     .modal-btn.danger { background: var(--danger); color: #fff; }
     
+    /* Video Edit Modal */
+    .video-edit-modal .modal-content {
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
     /* Toast */
     .toast {
       position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%;
@@ -546,12 +554,18 @@
         background: rgba(0, 255, 136, 0.2); color: var(--success);
         padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;
       }
+      
+      /* Mobile Table Improvements */
+      .cosmic-table { min-width: 600px; font-size: 0.85rem; }
+      .cosmic-table th, .cosmic-table td { padding: 10px; }
+      .btn-icon { width: 32px; height: 32px; font-size: 0.9rem; }
     }
     
     @media (max-width: 480px) {
       .logo { font-size: 1.1rem; }
       .account-btn { font-size: 0.7rem; padding: 6px 8px; max-width: 120px; }
       .module-header { font-size: 1.1rem; }
+      .cosmic-table { min-width: 550px; }
     }
   </style>
 </head>
@@ -746,7 +760,7 @@
           </button>
         </div>
         
-        <!-- Mobile Only Services List (Visible on Mobile, Hidden on Desktop via CSS if needed, but here we just put it in settings) -->
+        <!-- Mobile Only Services List -->
         <div class="card" style="margin-top: 20px;">
            <h3 style="color: var(--accent-cyan); margin-bottom: 15px;">🔗 Все сервисы</h3>
            <div class="service-list">
@@ -889,6 +903,54 @@
     </div>
   </div>
 
+  <!-- Video Edit Modal -->
+  <div class="modal-overlay video-edit-modal" id="video-edit-modal">
+    <div class="modal-content">
+      <div class="modal-title">✏️ Редактировать видео</div>
+      
+      <div class="input-group">
+        <label class="input-label">📝 Сценарий</label>
+        <textarea class="input-cosmic" id="edit-video-text" rows="3"></textarea>
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">🔗 Исходник</label>
+        <input type="text" class="input-cosmic" id="edit-video-link">
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">📅 Дата</label>
+        <input type="date" class="input-cosmic" id="edit-video-date">
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">⏰ Время</label>
+        <input type="time" class="input-cosmic" id="edit-video-time">
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">📄 Перевод / Текст для озвучки</label>
+        <textarea class="input-cosmic" id="edit-video-translation" rows="4" placeholder="Немецкий перевод..."></textarea>
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">🔥 Заголовок</label>
+        <input type="text" class="input-cosmic" id="edit-video-title" placeholder="Вирусный заголовок...">
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">#️⃣ Хештеги</label>
+        <input type="text" class="input-cosmic" id="edit-video-hashtags" placeholder="#fyp #viral...">
+      </div>
+      
+      <div class="modal-buttons">
+        <button class="modal-btn secondary" onclick="closeVideoEditModal()">Отмена</button>
+        <button class="modal-btn primary" onclick="saveVideoEdit()">💾 Сохранить</button>
+        <button class="modal-btn" style="background: var(--success); color: #000;" onclick="downloadVideoText()">📄 Скачать текст</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Task Date Picker Modal -->
   <div class="date-picker-modal" id="date-picker-modal">
     <div class="date-picker-content">
@@ -932,14 +994,15 @@
     let currentDate = new Date();
     let selectedDate = null;
     let editingAccountId = null;
+    let currentEditVideoId = null;
 
     function loadData() {
-      const saved = localStorage.getItem('tiktok_razeb_final_v2');
+      const saved = localStorage.getItem('tiktok_razeb_final_v3');
       if (saved) appData = JSON.parse(saved);
       else { appData = JSON.parse(JSON.stringify(defaultAccounts)); saveData(); }
     }
 
-    function saveData() { localStorage.setItem('tiktok_razeb_final_v2', JSON.stringify(appData)); }
+    function saveData() { localStorage.setItem('tiktok_razeb_final_v3', JSON.stringify(appData)); }
     function getCurrentAccount() { return appData[currentAccountId]; }
 
     function renderAccounts() {
@@ -983,6 +1046,10 @@
 
     function closeModal() { document.getElementById('account-modal').classList.remove('show'); }
     function closeTaskDatePicker() { document.getElementById('date-picker-modal').classList.remove('show'); }
+    function closeVideoEditModal() { 
+      document.getElementById('video-edit-modal').classList.remove('show');
+      currentEditVideoId = null;
+    }
 
     function saveAccount() {
       const name = document.getElementById('acc-name').value.trim();
@@ -1019,7 +1086,6 @@
         else m.classList.remove('active');
       });
       
-      // Handle Mobile Nav
       if(navItem) {
          document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
          navItem.classList.add('active');
@@ -1081,7 +1147,8 @@
       getCurrentAccount().videos.unshift({
         id: Date.now(), text, link,
         datetime: date && time ? `${date} ${time}` : date || '',
-        status: 'Идея', analytics: 'Ожидание'
+        status: 'Идея', analytics: 'Ожидание',
+        translation: '', title: '', hashtags: ''
       });
       
       saveData();
@@ -1127,6 +1194,8 @@
             </select>
           </td>
           <td>
+            <button class="btn-icon" onclick="openVideoEdit(${v.id})" title="Редактировать">✏️</button>
+            <button class="btn-icon btn-text" onclick="downloadVideoTextDirect(${v.id})" title="Скачать текст">📄</button>
             <button class="btn-icon" onclick="window.open('${v.link || '#'}', '_blank')" ${!v.link?'style="opacity:0.3"':''}>👁️</button>
             <button class="btn-icon btn-delete" onclick="deleteVideo(${v.id})">🗑</button>
           </td>
@@ -1137,6 +1206,85 @@
     function updateField(id, field, value) {
       const video = getCurrentAccount().videos.find(v => v.id === id);
       if (video) { video[field] = value; saveData(); updateStats(); }
+    }
+
+    function openVideoEdit(id) {
+      const video = getCurrentAccount().videos.find(v => v.id === id);
+      if (!video) return;
+      
+      currentEditVideoId = id;
+      document.getElementById('edit-video-text').value = video.text || '';
+      document.getElementById('edit-video-link').value = video.link || '';
+      document.getElementById('edit-video-date').value = video.datetime ? video.datetime.split(' ')[0] : '';
+      document.getElementById('edit-video-time').value = video.datetime && video.datetime.split(' ')[1] ? video.datetime.split(' ')[1] : '';
+      document.getElementById('edit-video-translation').value = video.translation || '';
+      document.getElementById('edit-video-title').value = video.title || '';
+      document.getElementById('edit-video-hashtags').value = video.hashtags || '';
+      
+      document.getElementById('video-edit-modal').classList.add('show');
+    }
+
+    function saveVideoEdit() {
+      const video = getCurrentAccount().videos.find(v => v.id === currentEditVideoId);
+      if (!video) return;
+      
+      const date = document.getElementById('edit-video-date').value;
+      const time = document.getElementById('edit-video-time').value;
+      
+      video.text = document.getElementById('edit-video-text').value;
+      video.link = document.getElementById('edit-video-link').value;
+      video.datetime = date && time ? `${date} ${time}` : date || '';
+      video.translation = document.getElementById('edit-video-translation').value;
+      video.title = document.getElementById('edit-video-title').value;
+      video.hashtags = document.getElementById('edit-video-hashtags').value;
+      
+      saveData();
+      renderVideos();
+      closeVideoEditModal();
+      showToast('✅ Сохранено');
+    }
+
+    function downloadVideoTextDirect(id) {
+      const video = getCurrentAccount().videos.find(v => v.id === id);
+      if (!video) return;
+      downloadVideoTextContent(video);
+    }
+
+    function downloadVideoText() {
+      const video = getCurrentAccount().videos.find(v => v.id === currentEditVideoId);
+      if (!video) return;
+      downloadVideoTextContent(video);
+    }
+
+    function downloadVideoTextContent(video) {
+      let text = `🎬 ВИДЕО: ${video.text || 'Без названия'}\n`;
+      text += `📅 Дата: ${video.datetime || '—'}\n`;
+      text += `🔗 Ссылка: ${video.link || '—'}\n`;
+      text += `📊 Статус: ${video.status || '—'}\n`;
+      text += `📈 Результат: ${video.analytics || '—'}\n\n`;
+      
+      if (video.translation) {
+        text += `🇩🇪 ПЕРЕВОД / ТЕКСТ ДЛЯ ОЗВУЧКИ:\n${video.translation}\n\n`;
+      }
+      
+      if (video.title) {
+        text += `🔥 ЗАГОЛОВОК:\n${video.title}\n\n`;
+      }
+      
+      if (video.hashtags) {
+        text += `#️⃣ ХЕШТЕГИ:\n${video.hashtags}\n`;
+      }
+      
+      const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `video_${video.id}_${new Date().toISOString().split('T')[0]}.txt`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      showToast('📄 Текст скачан');
     }
 
     function deleteVideo(id) {
@@ -1287,7 +1435,7 @@
           appData = JSON.parse(e.target.result);
           saveData();
           renderAccounts(); renderVideos(); renderPrompts(); renderCompetitors(); renderTasks(); updateStats();
-          showToast('📤 Данные восстановлены');
+          showToast('📤 Восстановлено');
         } catch (err) { showToast('❌ Ошибка файла'); }
       };
       reader.readAsText(file);
@@ -1295,8 +1443,8 @@
     }
 
     function clearAllData() {
-      if (confirm('⚠️ ЭТО УДАЛИТ ВСЁ НАВСЕГДА. ТОЧНО?')) {
-        localStorage.removeItem('tiktok_razeb_final_v2');
+      if (confirm('⚠️ УДАЛИТЬ ВСЁ НАВСЕГДА?')) {
+        localStorage.removeItem('tiktok_razeb_final_v3');
         location.reload();
       }
     }
@@ -1333,7 +1481,7 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    setInterval(renderTasks, 60000); // Check overdue every minute
+    setInterval(renderTasks, 60000);
 
     // Init
     loadData();
